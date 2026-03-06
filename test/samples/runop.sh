@@ -363,12 +363,35 @@ process_one_dir() {
     # `TRESHAPE(dst, src)` instead of an invalid Tile-to-pointer cast sequence.
     if [[ "$base" == "reshape" ]]; then
       if ! grep -Fq "TRESHAPE(" "$cpp"; then
-        echo -e "${A}(${base}.py)\tFAIL\tmissing TRESHAPE() lowering for SSA treshape"
+        echo -e "${A}(${base}.py)	FAIL	missing TRESHAPE() lowering for SSA treshape"
         overall=1
         continue
       fi
-      if grep -Eq "= \\(__ubuf__ [^)]+\\*\\) v[0-9]+;" "$cpp"; then
-        echo -e "${A}(${base}.py)\tFAIL\tfound invalid Tile-to-__ubuf__ pointer cast (issue #207)"
+      if grep -Eq "= \(__ubuf__ [^)]+\*\) v[0-9]+;" "$cpp"; then
+        echo -e "${A}(${base}.py)	FAIL	found invalid Tile-to-__ubuf__ pointer cast (issue #207)"
+        overall=1
+        continue
+      fi
+    fi
+
+    if [[ "$base" == "bitcast_dtype_alias" ]]; then
+      if ! grep -Eq "Tile<[^>]*, int32_t," "$cpp"; then
+        echo -e "${A}(${base}.py)	FAIL	missing int32_t Tile declaration for pto.bitcast"
+        overall=1
+        continue
+      fi
+      if [[ $(grep -c "TASSIGN(" "$cpp") -lt 3 ]]; then
+        echo -e "${A}(${base}.py)	FAIL	expected TASSIGN()-based alias lowering for pto.bitcast"
+        overall=1
+        continue
+      fi
+      if [[ $(grep -c "TRESHAPE(" "$cpp") -ne 1 ]]; then
+        echo -e "${A}(${base}.py)	FAIL	pto.bitcast should not lower via TRESHAPE()"
+        overall=1
+        continue
+      fi
+      if ! grep -Eq "(PTOAS__TILE_DATA|\.data\(\))" "$cpp"; then
+        echo -e "${A}(${base}.py)	FAIL	missing tile-address alias lowering for pto.bitcast"
         overall=1
         continue
       fi
