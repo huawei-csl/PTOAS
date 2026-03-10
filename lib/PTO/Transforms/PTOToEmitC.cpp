@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "PTO/IR/PTO.h"
+#include "PTO/IR/PTOSyncUtils.h"
 #include "PTO/Transforms/Passes.h"
 
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
@@ -3501,44 +3502,6 @@ static inline std::string evtTokFromEventAttr(mlir::pto::EventAttr a) {
   return mlir::pto::stringifyEVENT(a.getEvent()).str();
 }
 
-static FailureOr<mlir::pto::SyncOpType>
-getSyncOpTypeFromBufSyncAttr(Attribute attr) {
-  if (auto a = attr.dyn_cast<mlir::pto::PipeEventTypeAttr>())
-    return a.getOpType();
-  if (auto a = attr.dyn_cast<mlir::pto::SyncOpTypeAttr>())
-    return a.getOpType();
-  return failure();
-}
-
-static mlir::pto::PIPE getPipeFromSyncOpType(mlir::pto::SyncOpType opType) {
-  using SyncOpType = mlir::pto::SyncOpType;
-  using PIPE = mlir::pto::PIPE;
-  switch (opType) {
-  case SyncOpType::TLOAD:
-    return PIPE::PIPE_MTE2;
-  case SyncOpType::TSTORE_VEC:
-    return PIPE::PIPE_MTE3;
-  case SyncOpType::TSTORE_ACC:
-    return PIPE::PIPE_FIX;
-  case SyncOpType::TMOV_M2L:
-  case SyncOpType::TMOV_M2B:
-    return PIPE::PIPE_MTE1;
-  case SyncOpType::TMOV_M2S:
-    return PIPE::PIPE_FIX;
-  case SyncOpType::TMOV_M2V:
-    return PIPE::PIPE_V;
-  case SyncOpType::TMOV_V2M:
-    return PIPE::PIPE_FIX;
-  case SyncOpType::TMATMUL:
-    return PIPE::PIPE_M;
-  case SyncOpType::TVEC:
-  case SyncOpType::TVECWAIT_EVENT:
-    return PIPE::PIPE_V;
-  default:
-    return PIPE::PIPE_UNASSIGNED;
-  }
-}
-
 template <typename T, typename = void>
 struct HasGetSrcPipe : std::false_type {};
 template <typename T>
@@ -3670,12 +3633,11 @@ struct PTOGetBufToEmitC : public OpConversionPattern<mlir::pto::GetBufOp> {
     (void)adaptor;
     auto *ctx = rewriter.getContext();
 
-    auto opTypeOr = getSyncOpTypeFromBufSyncAttr(op.getOpTypeAttr());
+    auto opTypeOr = parseSyncOpTypeLikeAttr(op.getOpTypeAttr());
     if (failed(opTypeOr))
       return rewriter.notifyMatchFailure(op, "get_buf expects pipe_event_type/sync_op_type attr");
-    auto pipe = getPipeFromSyncOpType(*opTypeOr);
-    if (pipe == mlir::pto::PIPE::PIPE_UNASSIGNED ||
-        pipe == mlir::pto::PIPE::PIPE_ALL)
+    auto pipe = mapSyncOpTypeToPipe(*opTypeOr);
+    if (!isConcreteSyncPipe(pipe))
       return rewriter.notifyMatchFailure(op, "get_buf op_type cannot map to a concrete pipe");
     std::string pipeTok = pipeTokFromPipeEnum(pipe);
     auto argsAttr = rewriter.getArrayAttr({
@@ -3701,12 +3663,11 @@ struct PTORlsBufToEmitC : public OpConversionPattern<mlir::pto::RlsBufOp> {
     (void)adaptor;
     auto *ctx = rewriter.getContext();
 
-    auto opTypeOr = getSyncOpTypeFromBufSyncAttr(op.getOpTypeAttr());
+    auto opTypeOr = parseSyncOpTypeLikeAttr(op.getOpTypeAttr());
     if (failed(opTypeOr))
       return rewriter.notifyMatchFailure(op, "rls_buf expects pipe_event_type/sync_op_type attr");
-    auto pipe = getPipeFromSyncOpType(*opTypeOr);
-    if (pipe == mlir::pto::PIPE::PIPE_UNASSIGNED ||
-        pipe == mlir::pto::PIPE::PIPE_ALL)
+    auto pipe = mapSyncOpTypeToPipe(*opTypeOr);
+    if (!isConcreteSyncPipe(pipe))
       return rewriter.notifyMatchFailure(op, "rls_buf op_type cannot map to a concrete pipe");
     std::string pipeTok = pipeTokFromPipeEnum(pipe);
     auto argsAttr = rewriter.getArrayAttr({

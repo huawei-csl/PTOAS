@@ -2,6 +2,7 @@
 add_mlir_dialect_library(PTOIR
   PTO.cpp
   PTOAttrs.cpp
+  PTOSyncUtils.cpp
   PTOTypeDefs.cpp
 
   ADDITIONAL_HEADER_DIRS

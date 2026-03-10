@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "PTO/IR/PTO.h"
+#include "PTO/IR/PTOSyncUtils.h"
 
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
@@ -1973,55 +1974,20 @@ LogicalResult StoreScalarOp::verify() {
 }
 
 // ---- GetBufOp / RlsBufOp ----
-static FailureOr<SyncOpType> getSyncOpTypeFromBufSyncAttr(Attribute attr,
-                                                          Operation *op) {
-  if (auto a = attr.dyn_cast<PipeEventTypeAttr>())
-    return a.getOpType();
-  if (auto a = attr.dyn_cast<SyncOpTypeAttr>())
-    return a.getOpType();
-  auto diag =
-      op->emitOpError("expects 'op_type' to be pipe_event_type/sync_op_type, got ");
-  diag << attr;
-  return failure();
-}
-
-static pto::PIPE mapSyncOpTypeToPipe(SyncOpType opType) {
-  switch (opType) {
-  case SyncOpType::TLOAD:
-    return pto::PIPE::PIPE_MTE2;
-  case SyncOpType::TSTORE_VEC:
-    return pto::PIPE::PIPE_MTE3;
-  case SyncOpType::TSTORE_ACC:
-    return pto::PIPE::PIPE_FIX;
-  case SyncOpType::TMOV_M2L:
-  case SyncOpType::TMOV_M2B:
-    return pto::PIPE::PIPE_MTE1;
-  case SyncOpType::TMOV_M2S:
-    return pto::PIPE::PIPE_FIX;
-  case SyncOpType::TMOV_M2V:
-    return pto::PIPE::PIPE_V;
-  case SyncOpType::TMOV_V2M:
-    return pto::PIPE::PIPE_FIX;
-  case SyncOpType::TMATMUL:
-    return pto::PIPE::PIPE_M;
-  case SyncOpType::TVEC:
-  case SyncOpType::TVECWAIT_EVENT:
-    return pto::PIPE::PIPE_V;
-  default:
-    return pto::PIPE::PIPE_UNASSIGNED;
-  }
-}
-
 static LogicalResult verifyBufSyncOp(Operation *op, Attribute opTypeAttr,
                                      IntegerAttr bufIdAttr, IntegerAttr modeAttr) {
   if (!opTypeAttr)
     return op->emitOpError("expects 'op_type' attribute");
 
-  auto opTypeOr = getSyncOpTypeFromBufSyncAttr(opTypeAttr, op);
-  if (failed(opTypeOr))
+  auto opTypeOr = parseSyncOpTypeLikeAttr(opTypeAttr);
+  if (failed(opTypeOr)) {
+    auto diag =
+        op->emitOpError("expects 'op_type' to be pipe_event_type/sync_op_type, got ");
+    diag << opTypeAttr;
     return failure();
+  }
   pto::PIPE pipe = mapSyncOpTypeToPipe(*opTypeOr);
-  if (pipe == pto::PIPE::PIPE_ALL || pipe == pto::PIPE::PIPE_UNASSIGNED)
+  if (!isConcreteSyncPipe(pipe))
     return op->emitOpError("expects 'op_type' to map to a concrete pipe, not PIPE_ALL/PIPE_UNASSIGNED");
 
   if (!bufIdAttr)
