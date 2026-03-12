@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         choices=("dev", "release"),
         default="dev",
-        help="release mode bumps the base version by +0.1.",
+        help="release mode increments the minor component by 1 (for example, 0.7 -> 0.8 and 0.10 -> 0.11).",
     )
     parser.add_argument(
         "--check-tag",
@@ -42,9 +42,6 @@ def bump_version(base_version: str) -> str:
     major_str, minor_str = base_version.split(".")
     major = int(major_str)
     minor = int(minor_str) + 1
-    if minor >= 10:
-        major += minor // 10
-        minor = minor % 10
     return f"{major}.{minor}"
 
 

@@ -205,7 +205,7 @@ ptoas --version
 ```
 
 > `ptoas --version` 默认显示项目根目录 `CMakeLists.txt` 里的基线版本；
-> GitHub `release` workflow 会基于这个版本自动 `+0.1`，并校验 release tag 与结果一致。
+> GitHub `release` workflow 会把版本号的第二段自动 `+1`，例如 `0.7 -> 0.8`、`0.10 -> 0.11`，并校验 release tag 与结果一致。
 
 ### 5.2 Python 接口 (Python API)
 
