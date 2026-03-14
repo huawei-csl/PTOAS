@@ -82,7 +82,7 @@ include_directories(
 )
 
 	add_library(assemble_kernel SHARED assemble_kernel.cpp launch.cpp)
-	target_compile_options(assemble_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} --cce-aicore-arch=dav-c220-vec -DMEMORY_BASE -std=c++17)
+	target_compile_options(assemble_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} --cce-aicore-arch=dav-c220-cube -DMEMORY_BASE -std=c++17)
 	target_include_directories(assemble_kernel PRIVATE
 	    ${ASCEND_HOME_PATH}/pkg_inc/
 	    ${ASCEND_HOME_PATH}/pkg_inc/profiling/

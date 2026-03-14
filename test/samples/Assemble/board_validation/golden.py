@@ -7,22 +7,16 @@ import numpy as np
 def main():
     np.random.seed(19)
 
-    # Inputs
-    src = np.random.random(size=(16, 16)).astype(np.float32)
-    dst = np.random.random(size=(32, 32)).astype(np.float32)
-
-    # Kernel reads an initial output buffer; keep deterministic content.
+    src_a = np.random.random(size=(32, 32)).astype(np.float32)
+    src_b = np.random.random(size=(32, 32)).astype(np.float32)
+    # Identity matrix used by the post-assemble matmul path.
+    rhs_identity = np.eye(32, dtype=np.float16)
     out_init = np.zeros((32, 32), dtype=np.float32)
 
-    # Golden for TAssemble semantics:
-    # dst[i + 8, j + 8] = src[i, j]
-    golden = dst.copy()
-    golden[8:24, 8:24] = src
-
-    src.tofile("v1.bin")
-    dst.tofile("v2.bin")
-    out_init.tofile("v3.bin")
-    golden.tofile("golden_v3.bin")
+    src_a.tofile("v1.bin")
+    src_b.tofile("v2.bin")
+    rhs_identity.tofile("v3.bin")
+    out_init.tofile("v4.bin")
 
 
 if __name__ == "__main__":

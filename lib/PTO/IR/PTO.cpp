@@ -1542,8 +1542,14 @@ mlir::LogicalResult mlir::pto::TAssembleOp::verify() {
   if (srcShape.size() != 2 || dstShape.size() != 2)
     return emitOpError("expects rank-2 shaped types for src/dst");
 
-  if (getElemTy(srcTy) != getElemTy(dstTy))
-    return emitOpError("expects src element type == dst element type");
+  Type srcElemTy = getElemTy(srcTy);
+  Type dstElemTy = getElemTy(dstTy);
+  bool sameElemTy = srcElemTy == dstElemTy;
+  bool castElemTy =
+      srcElemTy.isF32() && (dstElemTy.isF16() || dstElemTy.isBF16());
+  if (!sameElemTy && !castElemTy)
+    return emitOpError(
+        "expects src/dst element types to match, or src=f32 with dst=f16/bf16");
 
   if (!getIndexRow().getType().isIndex() || !getIndexCol().getType().isIndex())
     return emitOpError("expects indexRow/indexCol to be index type");

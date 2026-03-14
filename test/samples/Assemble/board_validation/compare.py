@@ -155,7 +155,7 @@ def compare_packed_pred_mask(golden_path, output_path, rows, cols):
 def main():
     strict = os.getenv("COMPARE_STRICT", "1") != "0"
     ok = True
-    ok = compare_bin("golden_v3.bin", "v3.bin", np.float32, 0.0001) and ok
+    ok = compare_bin("golden_v4.bin", "v4.bin", np.float32, 0.0001) and ok
     if not ok:
         if strict:
             print("[ERROR] compare failed")

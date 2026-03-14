@@ -51,15 +51,15 @@ struct MrgSortExecutedNumList {
 #endif
 
 #if defined(__CCE_AICORE__)
-__global__ AICORE void assemble_kernel(__gm__ float* v1, __gm__ float* v2, __gm__ float* v3);
+__global__ AICORE void assemble_kernel(__gm__ float* v1, __gm__ float* v2, __gm__ half* v3, __gm__ float* v4);
 #else
-__global__ AICORE void assemble_kernel(__gm__ float* v1, __gm__ float* v2, __gm__ float* v3);
+__global__ AICORE void assemble_kernel(__gm__ float* v1, __gm__ float* v2, __gm__ half* v3, __gm__ float* v4);
 #endif
 
-void LaunchAssemble_kernel(float *v1, float *v2, float *v3, void *stream) {
+void LaunchAssemble_kernel(float *v1, float *v2, aclFloat16 *v3, float *v4, void *stream) {
 #if defined(__CCE_AICORE__)
-    assemble_kernel<<<1, nullptr, stream>>>((__gm__ float*)v1, (__gm__ float*)v2, (__gm__ float*)v3);
+    assemble_kernel<<<1, nullptr, stream>>>((__gm__ float*)v1, (__gm__ float*)v2, (__gm__ half*)v3, (__gm__ float*)v4);
 #else
-    assemble_kernel<<<1, nullptr, stream>>>((__gm__ float*)v1, (__gm__ float*)v2, (__gm__ float*)v3);
+    assemble_kernel<<<1, nullptr, stream>>>((__gm__ float*)v1, (__gm__ float*)v2, (__gm__ half*)v3, (__gm__ float*)v4);
 #endif
 }
