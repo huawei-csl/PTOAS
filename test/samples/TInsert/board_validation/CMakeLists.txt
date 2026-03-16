@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_C_COMPILER bisheng)
 set(CMAKE_CXX_COMPILER bisheng)
 
-project(assemble_npu_validation)
+project(tinsert_npu_validation)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -81,48 +81,48 @@ include_directories(
     ${ASCEND_DRIVER_PATH}/kernel/inc
 )
 
-	add_library(assemble_kernel SHARED assemble_kernel.cpp launch.cpp)
-	target_compile_options(assemble_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} --cce-aicore-arch=dav-c220-cube -DMEMORY_BASE -std=c++17)
-	target_include_directories(assemble_kernel PRIVATE
+	add_library(tinsert_kernel SHARED tinsert_kernel.cpp launch.cpp)
+	target_compile_options(tinsert_kernel PRIVATE ${CMAKE_CCE_COMPILE_OPTIONS} --cce-aicore-arch=dav-c220-cube -DMEMORY_BASE -std=c++17)
+	target_include_directories(tinsert_kernel PRIVATE
 	    ${ASCEND_HOME_PATH}/pkg_inc/
 	    ${ASCEND_HOME_PATH}/pkg_inc/profiling/
 	    ${ASCEND_HOME_PATH}/pkg_inc/runtime/runtime
 	)
-target_link_options(assemble_kernel PRIVATE --cce-fatobj-link)
+target_link_options(tinsert_kernel PRIVATE --cce-fatobj-link)
 
-add_executable(assemble main.cpp)
-target_compile_options(assemble PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
-target_include_directories(assemble PRIVATE
+add_executable(tinsert main.cpp)
+target_compile_options(tinsert PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
+target_include_directories(tinsert PRIVATE
     ${PTO_ISA_ROOT}/include
     ${PTO_ISA_ROOT}/tests/common
 )
 
-target_link_directories(assemble PUBLIC
+target_link_directories(tinsert PUBLIC
     ${ASCEND_HOME_PATH}/lib64
 )
 
-target_link_libraries(assemble PRIVATE
-    assemble_kernel
+target_link_libraries(tinsert PRIVATE
+    tinsert_kernel
     runtime
     stdc++ ascendcl m tiling_api platform c_sec dl nnopbase
 )
 
 if(ENABLE_SIM_GOLDEN)
     # Simulator executable: used to generate golden outputs (Ascend camodel).
-    add_executable(assemble_sim main.cpp)
-    target_compile_options(assemble_sim PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
-    target_include_directories(assemble_sim PRIVATE
+    add_executable(tinsert_sim main.cpp)
+    target_compile_options(tinsert_sim PRIVATE ${CMAKE_CPP_COMPILE_OPTIONS})
+    target_include_directories(tinsert_sim PRIVATE
         ${PTO_ISA_ROOT}/include
         ${PTO_ISA_ROOT}/tests/common
     )
-    target_link_directories(assemble_sim PUBLIC
+    target_link_directories(tinsert_sim PUBLIC
         ${ASCEND_HOME_PATH}/lib64
         ${ASCEND_HOME_PATH}/aarch64-linux/simulator/${SOC_VERSION}/lib
         ${ASCEND_HOME_PATH}/simulator/${SOC_VERSION}/lib
         ${ASCEND_HOME_PATH}/tools/simulator/${SOC_VERSION}/lib
     )
-    target_link_libraries(assemble_sim PRIVATE
-        assemble_kernel
+    target_link_libraries(tinsert_sim PRIVATE
+        tinsert_kernel
         runtime_camodel
         stdc++ ascendcl m tiling_api platform c_sec dl nnopbase
     )

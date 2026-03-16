@@ -9,7 +9,7 @@ def main():
 
     src_a = np.random.random(size=(32, 32)).astype(np.float32)
     src_b = np.random.random(size=(32, 32)).astype(np.float32)
-    # Identity matrix used by the post-assemble matmul path.
+    # Identity matrix used by the post-tinsert matmul path.
     rhs_identity = np.eye(32, dtype=np.float16)
     out_init = np.zeros((32, 32), dtype=np.float32)
 

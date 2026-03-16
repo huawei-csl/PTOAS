@@ -92,7 +92,7 @@ def build():
 
             fn_ty = func.FunctionType.get([ptr_f32, ptr_f32, ptr_f16, ptr_f32], [])
             with InsertionPoint(m.body):
-                fn = func.FuncOp("assemble_kernel", fn_ty)
+                fn = func.FuncOp("tinsert_kernel", fn_ty)
                 entry = fn.add_entry_block()
 
             with InsertionPoint(entry):

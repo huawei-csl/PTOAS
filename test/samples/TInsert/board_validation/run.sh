@@ -106,13 +106,13 @@ copy_outputs_as_golden() {
 
 case "${GOLDEN_MODE}" in
   sim)
-    ACL_DEVICE_ID="${ACL_DEVICE_ID_SIM}" LD_LIBRARY_PATH="${LD_LIBRARY_PATH_SIM}" "${ROOT_DIR}/${BUILD_DIR}/assemble_sim"
+    ACL_DEVICE_ID="${ACL_DEVICE_ID_SIM}" LD_LIBRARY_PATH="${LD_LIBRARY_PATH_SIM}" "${ROOT_DIR}/${BUILD_DIR}/tinsert_sim"
     copy_outputs_as_golden
     if [[ "${RUN_MODE}" == "npu" ]]; then
       if [[ -n "${ACL_DEVICE_ID_NPU}" ]]; then
-        ACL_DEVICE_ID="${ACL_DEVICE_ID_NPU}" LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/assemble"
+        ACL_DEVICE_ID="${ACL_DEVICE_ID_NPU}" LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/tinsert"
       else
-        LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/assemble"
+        LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/tinsert"
       fi
     fi
     COMPARE_STRICT=1 python3 "${ROOT_DIR}/compare.py"
@@ -123,16 +123,16 @@ case "${GOLDEN_MODE}" in
       exit 2
     fi
     python3 "${ROOT_DIR}/golden.py"
-    LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/assemble"
+    LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/tinsert"
     copy_outputs_as_golden
     python3 "${ROOT_DIR}/golden.py"
-    LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/assemble"
+    LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/tinsert"
     COMPARE_STRICT=1 python3 "${ROOT_DIR}/compare.py"
     ;;
   skip)
     if [[ "${RUN_MODE}" == "npu" ]]; then
       python3 "${ROOT_DIR}/golden.py"
-      LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/assemble"
+      LD_LIBRARY_PATH="${LD_LIBRARY_PATH_NPU}" "${ROOT_DIR}/${BUILD_DIR}/tinsert"
     fi
     echo "[WARN] compare skipped (GOLDEN_MODE=skip)"
     ;;

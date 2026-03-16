@@ -1,4 +1,4 @@
-# Assemble NPU Validation (A3)
+# TInsert NPU Validation (A3)
 
 This test validates `pto.tinsert` functional correctness on board.
 
@@ -6,12 +6,12 @@ Semantics under test (A3-legal path):
 
 1. `acc0 = matmul(v1, v2)` in `ACC<f32>`
 2. `tinsert(acc0 -> MAT<f16>, indexRow=0, indexCol=0)`
-3. `acc1 = matmul(MAT_after_assemble, v3_identity)`
+3. `acc1 = matmul(MAT_after_tinsert, v3_identity)`
 4. store `acc1` to `v4`
 
 Golden reference:
 
-- default flow uses `assemble_sim` (Ascend simulator) to produce `golden_v4.bin`
+- default flow uses `tinsert_sim` (Ascend simulator) to produce `golden_v4.bin`
 - then runs NPU kernel and compares `v4.bin` vs `golden_v4.bin`
 
 Inputs/outputs:
@@ -25,7 +25,7 @@ Inputs/outputs:
 Run on A3:
 
 ```bash
-cd test/samples/Assemble/board_validation
+cd test/samples/TInsert/board_validation
 SOC_VERSION=Ascend910 ./run.sh
 ```
 

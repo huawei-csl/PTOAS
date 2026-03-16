@@ -52,7 +52,7 @@ struct MrgSortExecutedNumList {
 
 #include "pto/pto-inst.hpp"
 using namespace pto;
-__global__ AICORE void assemble_kernel(__gm__ float* v1, __gm__ float* v2, __gm__ half* v3, __gm__ float* v4) {
+__global__ AICORE void tinsert_kernel(__gm__ float* v1, __gm__ float* v2, __gm__ half* v3, __gm__ float* v4) {
   unsigned v5 = 1024;
   unsigned v6 = 32;
   unsigned v7 = 1;

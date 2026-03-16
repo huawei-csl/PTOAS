@@ -41,7 +41,7 @@ struct MrgSortExecutedNumList {
         }                                                                                        \
     } while (0)
 
-void LaunchAssemble_kernel(float *v1, float *v2, aclFloat16 *v3, float *v4, void *stream);
+void LaunchTInsert_kernel(float *v1, float *v2, aclFloat16 *v3, float *v4, void *stream);
 
 int main() {
         size_t elemCount_v1 = 1024;
@@ -93,7 +93,7 @@ int main() {
     ACL_CHECK(aclrtMemcpy(v2Device, fileSize_v2, v2Host, fileSize_v2, ACL_MEMCPY_HOST_TO_DEVICE));
     ACL_CHECK(aclrtMemcpy(v3Device, fileSize_v3, v3Host, fileSize_v3, ACL_MEMCPY_HOST_TO_DEVICE));
     ACL_CHECK(aclrtMemcpy(v4Device, fileSize_v4, v4Host, fileSize_v4, ACL_MEMCPY_HOST_TO_DEVICE));
-        LaunchAssemble_kernel(v1Device, v2Device, v3Device, v4Device, stream);
+        LaunchTInsert_kernel(v1Device, v2Device, v3Device, v4Device, stream);
 
     ACL_CHECK(aclrtSynchronizeStream(stream));
         ACL_CHECK(aclrtMemcpy(v4Host, fileSize_v4, v4Device, fileSize_v4, ACL_MEMCPY_DEVICE_TO_HOST));
