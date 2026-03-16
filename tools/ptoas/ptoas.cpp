@@ -66,9 +66,6 @@ static LogicalResult reorderEmitCFunctions(ModuleOp module) {
     definitionsByName[func.getSymNameAttr()] = func;
   }
 
-  if (declarations.empty() && definitions.size() <= 1)
-    return success();
-
   llvm::DenseMap<Operation *, unsigned> indegree;
   llvm::DenseMap<Operation *, SmallVector<Operation *>> outgoing;
   for (auto func : definitions)
@@ -126,6 +123,9 @@ static LogicalResult reorderEmitCFunctions(ModuleOp module) {
     return module.emitError()
            << "cyclic function call graph is not supported for EmitC C++ emission";
   }
+
+  if (declarations.empty() && definitions.size() <= 1)
+    return success();
 
   SmallVector<emitc::FuncOp> desiredOrder;
   desiredOrder.append(declarations.begin(), declarations.end());
