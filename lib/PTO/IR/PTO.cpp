@@ -975,12 +975,9 @@ LogicalResult mlir::pto::PartitionViewOp::verify() {
     return emitOpError() << "size count (" << getSizes().size()
                          << ") must match source rank (" << srcRank << ")";
 
-  if (resTy.getRank() != srcRank)
-    return emitOpError() << "result rank (" << resTy.getRank()
-                         << ") must match source rank (" << srcRank << ")";
-
   ArrayRef<int64_t> srcShape = srcTy.getShape();
   ArrayRef<int64_t> resShape = resTy.getShape();
+  bool sameRank = resTy.getRank() == srcRank;
 
   for (int64_t i = 0; i < srcRank; ++i) {
     auto offVal = getConstIndexValue(getOffsets()[i]);
@@ -994,17 +991,12 @@ LogicalResult mlir::pto::PartitionViewOp::verify() {
       return emitOpError() << "size at dim " << i
                            << " must be positive, got " << *sizeVal;
 
-    int64_t resDim = resShape[i];
-    if (sizeVal) {
+    if (sameRank && sizeVal) {
+      int64_t resDim = resShape[i];
       if (resDim != ShapedType::kDynamic && *sizeVal != resDim)
         return emitOpError() << "size/result mismatch at dim " << i
                              << ": size operand=" << *sizeVal
                              << " result type dim=" << resDim;
-    } else if (resDim != ShapedType::kDynamic) {
-      return emitOpError() << "size at dim " << i
-                           << " must be compile-time constant to match static "
-                              "result dim "
-                           << resDim;
     }
 
     int64_t srcDim = srcShape[i];

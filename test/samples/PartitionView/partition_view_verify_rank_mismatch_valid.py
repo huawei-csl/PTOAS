@@ -1,6 +1,6 @@
 def build() -> str:
     return """module {
-  func.func @partition_view_verify_rank_mismatch_invalid(%ptr : !pto.ptr<f32>) {
+  func.func @partition_view_verify_rank_mismatch_valid(%ptr : !pto.ptr<f32>) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
