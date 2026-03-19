@@ -2521,6 +2521,14 @@ LogicalResult pto::TColExpandMulOp::verify() {
   return verifyTColExpandBinaryLikeOp(getOperation(), getSrc0().getType(),
                                       getSrc1().getType(), getDst().getType());
 }
+LogicalResult pto::TColExpandDivOp::verify() {
+  return verifyTColExpandBinaryLikeOp(getOperation(), getSrc0().getType(),
+                                      getSrc1().getType(), getDst().getType());
+}
+LogicalResult pto::TColExpandSubOp::verify() {
+  return verifyTColExpandBinaryLikeOp(getOperation(), getSrc0().getType(),
+                                      getSrc1().getType(), getDst().getType());
+}
 LogicalResult pto::TColExpandMaxOp::verify() {
   return verifyTColExpandBinaryLikeOp(getOperation(), getSrc0().getType(),
                                       getSrc1().getType(), getDst().getType());
@@ -5245,6 +5253,31 @@ mlir::LogicalResult mlir::pto::TRowExpandSubOp::verify() {
   return dispatchVerifierByArch(getOperation(), verifyA2A3, verifyA5);
 }
 
+mlir::LogicalResult mlir::pto::TRowExpandAddOp::verify() {
+  auto verifyCommon = [&]() -> LogicalResult {
+    Type src0Ty = getSrc0().getType();
+    Type src1Ty = getSrc1().getType();
+    Type dstTy = getDst().getType();
+    if (failed(verifyTileBufCommon(*this, src0Ty, "src0")) ||
+        failed(verifyTileBufCommon(*this, src1Ty, "src1")) ||
+        failed(verifyTileBufCommon(*this, dstTy, "dst")))
+      return failure();
+    if (failed(verifyTileBufSameShapeAndElem(*this, src0Ty, dstTy, "src0", "dst")))
+      return failure();
+    if (getElemTy(src0Ty) != getElemTy(src1Ty))
+      return emitOpError("expects src0 and src1 to have the same element type");
+    if (!isRowMajorTileBuf(dstTy))
+      return emitOpError("expects dst to use row-major layout");
+    auto ft = getElemTy(src0Ty).dyn_cast<mlir::FloatType>();
+    if (!ft || (!ft.isF16() && !ft.isF32()))
+      return emitOpError("expects element type to be f16 or f32");
+    return mlir::success();
+  };
+  auto verifyA2A3 = [&]() -> LogicalResult { return verifyCommon(); };
+  auto verifyA5 = [&]() -> LogicalResult { return verifyCommon(); };
+  return dispatchVerifierByArch(getOperation(), verifyA2A3, verifyA5);
+}
+
 
 mlir::LogicalResult mlir::pto::TRowMaxOp::verify() {
   auto verifyA2A3 = [&]() -> LogicalResult {
@@ -7035,6 +7068,8 @@ PTO_DEFINE_UNARY_EFFECTS(TCmpSOp, getSrcMutable(), getDstMutable())
 
 PTO_DEFINE_UNARY_EFFECTS(TColExpandOp, getSrcMutable(), getDstMutable())
 PTO_DEFINE_BINARY_EFFECTS(TColExpandMulOp, getSrc0Mutable(), getSrc1Mutable(), getDstMutable())
+PTO_DEFINE_BINARY_EFFECTS(TColExpandDivOp, getSrc0Mutable(), getSrc1Mutable(), getDstMutable())
+PTO_DEFINE_BINARY_EFFECTS(TColExpandSubOp, getSrc0Mutable(), getSrc1Mutable(), getDstMutable())
 PTO_DEFINE_BINARY_EFFECTS(TColExpandMaxOp, getSrc0Mutable(), getSrc1Mutable(), getDstMutable())
 PTO_DEFINE_BINARY_EFFECTS(TColExpandMinOp, getSrc0Mutable(), getSrc1Mutable(), getDstMutable())
 PTO_DEFINE_UNARY_EFFECTS(TColMaxOp, getSrcMutable(), getDstMutable())
@@ -7175,6 +7210,8 @@ void TRowExpandSubOp::getEffects(
     PTO_ADD_WRITE(tmp[0]);
   PTO_ADD_WRITE(getDstMutable());
 }
+
+PTO_DEFINE_BINARY_EFFECTS(TRowExpandAddOp, getSrc0Mutable(), getSrc1Mutable(), getDstMutable())
 
 // Row reductions use tmp scratch tile.
 void TRowMaxOp::getEffects(
