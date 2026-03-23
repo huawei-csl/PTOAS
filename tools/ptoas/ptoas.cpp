@@ -827,9 +827,7 @@ int main(int argc, char **argv) {
   // Main PassManager
   PassManager pm(&context);
   
-  // pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOInsertCVMovPass());
   // pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOConvertToDPSPass());
-  // pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOInsertLoadStoreForMixCVPass());
   pm.addNestedPass<mlir::func::FuncOp>(
       pto::createPTOLowerFrontendPipeOpsPass());
   pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOVerifyTFreePass());
@@ -852,10 +850,6 @@ int main(int argc, char **argv) {
   // Conditionally add Sync pass based on flag.
   if (enableInsertSync)
     pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOInsertSyncPass());
-
-  // pm.addNestedPass<mlir::func::FuncOp>(pto::createPTORemoveRedundantBarrierPass());
-  // pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOHighDimLoweringPass());
-  // pm.addNestedPass<mlir::func::FuncOp>(pto::createPTOVFloopGatherPass());
 
   pm.addPass(createCSEPass());
   module->getOperation()->setAttr("pto.target_arch",
