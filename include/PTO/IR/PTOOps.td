@@ -1672,8 +1672,6 @@ def SyncSetOp : PTO_Op<"sync.set"> {
     I32Attr:$event_id
   );
 
-  let hasVerifier = 1;
-
   let assemblyFormat = "$pipe `,` $event_id attr-dict";
 }
 
@@ -1688,8 +1686,6 @@ def SyncWaitOp : PTO_Op<"sync.wait"> {
     PTO_PipeAttr:$pipe,
     I32Attr:$event_id
   );
-
-  let hasVerifier = 1;
 
   let assemblyFormat = "$pipe `,` $event_id attr-dict";
 }
