@@ -1,0 +1,264 @@
+# 无 NPU 环境的 Compile-Only 指南
+
+本文档说明如何在**没有 `/dev/davinci*` 设备节点**的机器上，使用 `ptoas + CANN(bisheng) + pto-isa` 对生成的 `.cpp` 做**仅编译验证**。
+
+适用场景：
+
+- 本地开发机没有 NPU 卡，只想验证 `ptoas` 生成的 C++ 能否通过 `bisheng` 编译。
+- CI 或评审机只有 CANN 工具链，没有运行环境，不需要执行 kernel。
+- 想在上板前先做一轮 host-side compile-only 筛查。
+
+不适用场景：
+
+- 需要真正执行 kernel。
+- 需要生成 golden 并做数值比对。
+- 需要验证运行时 ACL / 驱动 / 权限问题。
+
+## 1. 结论先说
+
+- **可以**在无卡环境做 compile-only。
+- 需要的不是 NPU 卡，而是：
+  - `bisheng` 可用
+  - `ASCEND_HOME_PATH` 正确
+  - `pto-isa` 头文件和公共测试头可用
+- `STAGE=build` 不会检查 `/dev/davinci*`，因此可以直接复用现有验证脚本。
+- A5 case 对 `CANN` 与 `pto-isa` 版本对齐更敏感；如果遇到 A5 静态检查或头文件命名空间错误，需要优先检查版本匹配，而不是默认认为 `ptoas` 代码生成有问题。
+
+## 2. 依赖准备
+
+### 2.1 安装 CANN Toolkit
+
+无卡环境至少需要安装带 `bisheng` 的 CANN Toolkit。安装完成后，确认下面几项存在：
+
+```bash
+which bisheng
+bisheng --version
+ls /usr/local/Ascend
+```
+
+常见路径包括：
+
+- `/usr/local/Ascend/cann`
+- `/usr/local/Ascend/cann-<version>`
+- `/usr/local/Ascend/ascend-toolkit/latest`
+
+加载环境：
+
+```bash
+source /usr/local/Ascend/cann/set_env.sh
+# 或
+source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh
+```
+
+如果没有自动导出，也可以手动指定：
+
+```bash
+export ASCEND_HOME_PATH=/usr/local/Ascend/cann
+export PATH="$ASCEND_HOME_PATH/bin:$PATH"
+export LD_LIBRARY_PATH="$ASCEND_HOME_PATH/lib64:${LD_LIBRARY_PATH:-}"
+```
+
+### 2.2 准备 pto-isa
+
+`generate_testcase.py` 生成的工程会直接包含 `pto-isa`：
+
+- `${PTO_ISA_ROOT}/include`
+- `${PTO_ISA_ROOT}/tests/common`
+
+因此 `PTO_ISA_ROOT` 至少需要满足：
+
+```bash
+ls $PTO_ISA_ROOT/include
+ls $PTO_ISA_ROOT/tests/common
+```
+
+建议直接使用当前 CI pin 的版本，避免本地和 CI 结果不一致。
+
+## 3. 单个 case 的 compile-only
+
+### 3.1 先用 ptoas 生成 `.cpp`
+
+```bash
+./build/tools/ptoas/ptoas test/basic/example.pto -o /tmp/example-pto.cpp
+```
+
+如果是 A5 目标，生成时要显式指定：
+
+```bash
+./build/tools/ptoas/ptoas test/basic/example.pto --pto-arch a5 -o /tmp/example_a5-pto.cpp
+```
+
+### 3.2 生成验证工程
+
+```bash
+python3 test/npu_validation/scripts/generate_testcase.py \
+  --input /tmp/example-pto.cpp \
+  --testcase example \
+  --output-root /tmp/ptoas_compile_only \
+  --run-mode npu \
+  --soc-version Ascend910
+```
+
+生成后目录类似：
+
+```text
+/tmp/ptoas_compile_only/
+└── <sample_name>/
+    └── example/
+        ├── CMakeLists.txt
+        ├── example_kernel.cpp
+        ├── launch.cpp
+        ├── main.cpp
+        └── ...
+```
+
+### 3.3 只编译，不运行
+
+```bash
+cd /tmp/ptoas_compile_only/<sample_name>/example
+cmake -S . -B build \
+  -DSOC_VERSION=Ascend910 \
+  -DPTO_ISA_ROOT=$PTO_ISA_ROOT
+cmake --build build --parallel
+```
+
+这里不会访问 `/dev/davinci*`，因此无卡环境也可以完成。
+
+## 4. 复用仓库脚本做批量 compile-only
+
+如果你已经有一批 `*-pto.cpp`，最省事的方法不是自己写循环，而是直接复用：
+
+- `test/npu_validation/scripts/run_remote_npu_validation.sh`
+
+这个脚本在 `STAGE=build` 下：
+
+- 会生成 testcase
+- 会执行 `cmake` 和 `cmake --build`
+- **不会**做设备检查
+- **不会**运行可执行文件
+
+### 4.1 准备输入目录
+
+脚本默认扫描：
+
+- `test/samples/**/*.cpp` 中名字匹配 `*-pto.cpp` 的文件
+
+如果你要复用 CI 的样例生成链路，可以先执行：
+
+```bash
+export PTOAS_BIN=$PWD/build/tools/ptoas/ptoas
+export PTOBC_BIN=$PWD/build/tools/ptobc/ptobc
+export PYTHON_BIN=/usr/bin/python3
+export PTOAS_OUT_DIR=/tmp/ptoas_payload/test/samples
+export PYTHONPATH="$LLVM_BUILD_DIR/tools/mlir/python_packages/mlir_core:$PTO_INSTALL_DIR:${PYTHONPATH:-}"
+export LD_LIBRARY_PATH="$LLVM_BUILD_DIR/lib:$PTO_INSTALL_DIR/lib:${LD_LIBRARY_PATH:-}"
+
+bash test/samples/runop.sh --enablebc all
+```
+
+### 4.2 批量 compile-only
+
+如果当前目录已经准备好 `test/samples/**/*.cpp`，直接运行：
+
+```bash
+export STAGE=build
+export RUN_MODE=npu
+export SOC_VERSION=Ascend910
+export PTO_ISA_REPO=https://gitcode.com/cann/pto-isa.git
+export PTO_ISA_COMMIT=<与 CI 对齐的 commit>
+
+bash test/npu_validation/scripts/run_remote_npu_validation.sh
+```
+
+如果本地已经有 vendored 的 `pto-isa/` 目录，也可以不走网络 clone，脚本会优先使用本地目录。
+
+### 4.3 只编特定 case
+
+```bash
+export STAGE=build
+export RUN_ONLY_CASES=abs,gather,scatter
+bash test/npu_validation/scripts/run_remote_npu_validation.sh
+```
+
+### 4.4 跳过已知问题 case
+
+```bash
+export STAGE=build
+export SKIP_CASES=mix_kernel,print,storefp
+bash test/npu_validation/scripts/run_remote_npu_validation.sh
+```
+
+## 5. A3 / A5 的注意事项
+
+### 5.1 A3 通常更稳
+
+A3 compile-only 一般只要求：
+
+- 生成链路正确
+- `bisheng` 可用
+- `pto-isa` include 对齐
+
+### 5.2 A5 更依赖版本对齐
+
+A5 case 常见两类失败：
+
+1. **CANN 头文件 / intrinsics 与 pto-isa 不匹配**
+
+典型报错：
+
+```text
+no member named 'RoundZType' in namespace '__cce_simd'
+```
+
+这类问题通常不是 `.cpp` 语法本身错误，而是当前 `CANN` 与 `pto-isa` 的 A5 头文件接口不一致。
+
+建议处理顺序：
+
+1. 先对齐到 CI 使用的 `pto-isa` commit
+2. 再升级到与板端一致的 CANN 版本
+3. 最后再判断是否是 `ptoas` 代码生成问题
+
+2. **pto-isa A5 静态约束失败**
+
+典型报错：
+
+```text
+static assertion failed: Non-conforming matrix fractal
+```
+
+这类通常说明：
+
+- tile layout / fractal / pad 与 A5 要求不一致
+- 或者 `.py/.pto` 中的 A5 配置在 lowering 过程中被改写了
+
+这种情况需要检查生成出来的 `Tile<...>` 模板参数，而不是只看前端输入。
+
+## 6. 推荐排障顺序
+
+出现 compile-only 失败时，按下面顺序看：
+
+1. `which bisheng` / `bisheng --version`
+2. `echo $ASCEND_HOME_PATH`
+3. `ls $PTO_ISA_ROOT/include`
+4. 确认 `pto-isa` commit 是否与 CI 对齐
+5. 确认生成 `.cpp` 时使用的 `--pto-arch` 是否正确
+6. 对 A5 case，直接看生成的 `Tile<...>` 参数是否已经偏离预期
+
+## 7. 边界说明
+
+compile-only 能证明的是：
+
+- `ptoas` 生成的 C++ 能否被当前 `bisheng` + `pto-isa` + CANN 头文件接受
+
+compile-only **不能**证明：
+
+- kernel 在真实 NPU 上一定可运行
+- runtime / ACL / 驱动环境正确
+- 输出数值一定正确
+- 自动同步 / event 分配在真机上一定不会死锁
+
+因此更合理的验证顺序是：
+
+1. 本地或无卡机先做 compile-only
+2. 通过后再上板做 `STAGE=run`
+3. 最终以板测结果为准
