@@ -105,6 +105,30 @@ resolve_ptobc_bin() {
   return 1
 }
 
+copy_validation_assets() {
+  local sample_dir="$1"
+  local out_root="$2"
+  local out_sample_dir="$3"
+  local asset rel
+
+  if [[ -f "${BASE_DIR}/validation_runtime.py" ]]; then
+    cp -f "${BASE_DIR}/validation_runtime.py" "${out_root}/validation_runtime.py"
+  fi
+
+  for asset in "${sample_dir}"/*_golden.py "${sample_dir}"/*_compare.py; do
+    [[ -f "$asset" ]] || continue
+    cp -f "$asset" "${out_sample_dir}/"
+  done
+
+  if [[ -d "${sample_dir}/npu_validation" ]]; then
+    while IFS= read -r -d '' asset; do
+      rel="${asset#${sample_dir}/}"
+      mkdir -p "${out_sample_dir}/$(dirname "${rel}")"
+      cp -f "$asset" "${out_sample_dir}/${rel}"
+    done < <(find "${sample_dir}/npu_validation" -type f \( -name 'golden.py' -o -name 'compare.py' \) -print0)
+  fi
+}
+
 process_one_dir() {
   local A="$1" # folder name (e.g. Abs)
   local out_dir="$2"
@@ -112,6 +136,7 @@ process_one_dir() {
   dir="${BASE_DIR}/${A}"
   out_subdir="${out_dir}/${A}"
   mkdir -p "${out_subdir}"
+  copy_validation_assets "${dir}" "${out_dir}" "${out_subdir}"
 
   ptoas="$(resolve_ptoas_bin)"
   ptobc="$(resolve_ptobc_bin)"
