@@ -219,6 +219,10 @@ process_one_dir() {
       echo -e "${A}(${base}.py)\tSKIP\trequires --pto-arch=a3"
       continue
     fi
+    if [[ "$base" == "test_intercore_sync_a3_modes" && "$(printf '%s' "$target_arch" | tr '[:upper:]' '[:lower:]')" != "a3" ]]; then
+      echo -e "${A}(${base}.py)\tSKIP\trequires --pto-arch=a3"
+      continue
+    fi
     if [[ "$base" == "test_intercore_sync_a3_missing_setffts" && "$(printf '%s' "$target_arch" | tr '[:upper:]' '[:lower:]')" != "a3" ]]; then
       echo -e "${A}(${base}.py)\tSKIP\trequires --pto-arch=a3"
       continue
@@ -504,6 +508,23 @@ process_one_dir() {
       fi
       if grep -Fq "wait_flag_dev(3)" "$cpp"; then
         echo -e "${A}(${base}.py)\tFAIL\tunexpected static wait_flag_dev(3) in dynamic test"
+        overall=1
+        continue
+      fi
+    fi
+    if [[ "$base" == "test_intercore_sync_a3_modes" ]]; then
+      if ! grep -Fq "set_ffts_base_addr(" "$cpp"; then
+        echo -e "${A}(${base}.py)\tFAIL\tmissing set_ffts_base_addr() lowering"
+        overall=1
+        continue
+      fi
+      if ! grep -Fq "getFFTSMsg(0," "$cpp"; then
+        echo -e "${A}(${base}.py)\tFAIL\tmissing A3 getFFTSMsg(0, ...) lowering"
+        overall=1
+        continue
+      fi
+      if ! grep -Fq "getFFTSMsg(1," "$cpp"; then
+        echo -e "${A}(${base}.py)\tFAIL\tmissing A3 getFFTSMsg(1, ...) lowering"
         overall=1
         continue
       fi

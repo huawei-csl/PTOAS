@@ -1723,11 +1723,14 @@ def SyncSetOp : PTO_Op<"sync.set"> {
   let description = [{
     Sets a synchronization signal on the specified pipeline stage.
     Corresponds to `ffts_cross_core_sync` (A3) or `set_intra_block` (A5).
+    On A3, the optional `ffts_mode` attribute selects the first argument passed
+    to `getFFTSMsg`; if omitted, the legacy `FFTS_MODE_VAL` path is preserved.
   }];
 
   let arguments = (ins
     PTO_PipeAttr:$pipe,
     OptionalAttr<I32Attr>:$event_id,
+    OptionalAttr<I32Attr>:$ffts_mode,
     Optional<Index>:$event_id_dyn
   );
 
