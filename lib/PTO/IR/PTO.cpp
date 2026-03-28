@@ -1535,6 +1535,12 @@ LogicalResult mlir::pto::SyncSetOp::verify() {
   if (hasStatic == hasDynamic)
     return emitOpError()
            << "expects exactly one event-id form: static attr or dynamic index operand";
+  if (IntegerAttr fftsModeAttr = getFftsModeAttr()) {
+    int64_t fftsMode = fftsModeAttr.getInt();
+    if (fftsMode < 0 || fftsMode > 2)
+      return emitOpError() << "requires ffts_mode in range [0, 2], but got "
+                           << fftsMode;
+  }
   return success();
 }
 

@@ -492,9 +492,17 @@ static Value castInterCoreEventIdToI32(ConversionPatternRewriter &rewriter,
   return emitCCast(rewriter, loc, i32Ty, eventId);
 }
 
+static Attribute getFFTSModeCodegenArg(ConversionPatternRewriter &rewriter,
+                                       int64_t fftsMode) {
+  auto *ctx = rewriter.getContext();
+  if (fftsMode == 2)
+    return emitc::OpaqueAttr::get(ctx, "FFTS_MODE_VAL");
+  return emitc::OpaqueAttr::get(ctx, std::to_string(fftsMode));
+}
+
 static InterCoreSyncCallDesc buildInterCoreSyncSetCall(
     ConversionPatternRewriter &rewriter, Location loc, PTOArch targetArch,
-    pto::PipeAttr pipeAttr, IntegerAttr eventIdAttr) {
+    pto::PipeAttr pipeAttr, IntegerAttr eventIdAttr, int64_t fftsMode) {
   auto *ctx = rewriter.getContext();
   std::string pipeTok = pipeTokFromPipeAttr(pipeAttr);
 
@@ -505,7 +513,7 @@ static InterCoreSyncCallDesc buildInterCoreSyncSetCall(
 
     auto msgTy = emitc::OpaqueType::get(ctx, "uint16_t");
     auto msgArgs = rewriter.getArrayAttr({
-        emitc::OpaqueAttr::get(ctx, "FFTS_MODE_VAL"),
+        getFFTSModeCodegenArg(rewriter, fftsMode),
         IntegerAttr::get(IndexType::get(ctx), 0),
     });
     Value msgVal =
@@ -535,7 +543,7 @@ static InterCoreSyncCallDesc buildInterCoreSyncSetCall(
 
 static InterCoreSyncCallDesc buildInterCoreSyncSetCallDyn(
     ConversionPatternRewriter &rewriter, Location loc, PTOArch targetArch,
-    pto::PipeAttr pipeAttr, Value eventIdVal) {
+    pto::PipeAttr pipeAttr, Value eventIdVal, int64_t fftsMode) {
   auto *ctx = rewriter.getContext();
   std::string pipeTok = pipeTokFromPipeAttr(pipeAttr);
   Value eventI32 = castInterCoreEventIdToI32(rewriter, loc, eventIdVal);
@@ -543,7 +551,7 @@ static InterCoreSyncCallDesc buildInterCoreSyncSetCallDyn(
   if (targetArch == PTOArch::A3) {
     auto msgTy = emitc::OpaqueType::get(ctx, "uint16_t");
     auto msgArgs = rewriter.getArrayAttr({
-        emitc::OpaqueAttr::get(ctx, "FFTS_MODE_VAL"),
+        getFFTSModeCodegenArg(rewriter, fftsMode),
         IntegerAttr::get(IndexType::get(ctx), 0),
     });
     Value msgVal =
@@ -4251,6 +4259,9 @@ struct PTOSyncSetToEmitC : public OpConversionPattern<mlir::pto::SyncSetOp> {
     auto loc = op->getLoc();
     IntegerAttr eventIdAttr = op.getEventIdAttr();
     Value eventIdDyn = adaptor.getEventIdDyn();
+    int64_t fftsMode = 2;
+    if (IntegerAttr fftsModeAttr = op.getFftsModeAttr())
+      fftsMode = fftsModeAttr.getInt();
 
     if ((eventIdAttr != nullptr) == static_cast<bool>(eventIdDyn))
       return rewriter.notifyMatchFailure(
@@ -4259,10 +4270,10 @@ struct PTOSyncSetToEmitC : public OpConversionPattern<mlir::pto::SyncSetOp> {
     InterCoreSyncCallDesc desc;
     if (eventIdAttr) {
       desc = buildInterCoreSyncSetCall(rewriter, loc, targetArch, op.getPipe(),
-                                       eventIdAttr);
+                                       eventIdAttr, fftsMode);
     } else {
       desc = buildInterCoreSyncSetCallDyn(rewriter, loc, targetArch, op.getPipe(),
-                                          eventIdDyn);
+                                          eventIdDyn, fftsMode);
     }
     rewriter.create<emitc::CallOpaqueOp>(loc, TypeRange{}, desc.callee,
                                          /*args=*/desc.args,
