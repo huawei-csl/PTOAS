@@ -385,6 +385,11 @@ public:
       return emitc::OpaqueType::get(Ctx, "auto");
     });
 
+    addConversion([Ctx](pto::EventIdArrayType type) -> Type {
+      std::string tok = "PTOAS_EventIdArray<" + std::to_string(type.getSize()) + ">";
+      return emitc::OpaqueType::get(Ctx, tok);
+    });
+
     // ---------------------------------------------------------
     // 3. MemRef 转换 (Debug 重点)
     // ---------------------------------------------------------
@@ -4725,6 +4730,74 @@ struct PTODeclareTileToEmitC
   PTOArch targetArch;
 };
 
+struct PTODeclareEventIdArrayToEmitC
+    : public OpConversionPattern<mlir::pto::DeclareEventIdArrayOp> {
+  using OpConversionPattern<
+      mlir::pto::DeclareEventIdArrayOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(mlir::pto::DeclareEventIdArrayOp op,
+                                OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+    (void)adaptor;
+    Type arrayTy = getTypeConverter()->convertType(op.getArray().getType());
+    if (!arrayTy)
+      return rewriter.notifyMatchFailure(op,
+                                         "failed to map declared eventid_array type");
+
+    auto array = rewriter
+                     .create<emitc::VariableOp>(
+                         op.getLoc(), arrayTy,
+                         emitc::OpaqueAttr::get(rewriter.getContext(), ""))
+                     .getResult();
+    rewriter.replaceOp(op, array);
+    return success();
+  }
+};
+
+struct PTOEventIdArrayGetToEmitC
+    : public OpConversionPattern<mlir::pto::EventIdArrayGetOp> {
+  using OpConversionPattern<
+      mlir::pto::EventIdArrayGetOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(mlir::pto::EventIdArrayGetOp op,
+                                OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+    Value array = peelUnrealized(adaptor.getArray());
+    Value index = peelUnrealized(adaptor.getIndex());
+
+    Type resultTy = getTypeConverter()->convertType(op.getResult().getType());
+    if (!resultTy)
+      return rewriter.notifyMatchFailure(op,
+                                         "failed to map eventid_array get result type");
+
+    auto call = rewriter.create<emitc::CallOpaqueOp>(
+        op.getLoc(), TypeRange{resultTy}, "PTOAS__EVENTID_ARRAY_LOAD",
+        ArrayAttr{}, ArrayAttr{}, ValueRange{array, index});
+    rewriter.replaceOp(op, call.getResults());
+    return success();
+  }
+};
+
+struct PTOEventIdArraySetToEmitC
+    : public OpConversionPattern<mlir::pto::EventIdArraySetOp> {
+  using OpConversionPattern<
+      mlir::pto::EventIdArraySetOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(mlir::pto::EventIdArraySetOp op,
+                                OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+    Value array = peelUnrealized(adaptor.getArray());
+    Value index = peelUnrealized(adaptor.getIndex());
+    Value value = peelUnrealized(adaptor.getValue());
+
+    rewriter.create<emitc::CallOpaqueOp>(
+        op.getLoc(), TypeRange{}, "PTOAS__EVENTID_ARRAY_STORE",
+        ArrayAttr{}, ArrayAttr{}, ValueRange{array, index, value});
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 struct PTOTPushToEmitC : public OpConversionPattern<mlir::pto::TPushOp> {
   PTOTPushToEmitC(TypeConverter &typeConverter, MLIRContext *ctx,
                   PTOArch targetArch)
@@ -8477,6 +8550,9 @@ static void populatePTOToEmitCPatterns(RewritePatternSet &patterns,
   patterns.add<PTOInitializeL2G2LPipeToEmitC>(typeConverter, ctx, targetArch);
   patterns.add<PTOInitializeL2LPipeToEmitC>(typeConverter, ctx, targetArch);
   patterns.add<PTODeclareTileToEmitC>(typeConverter, ctx, targetArch);
+  patterns.add<PTODeclareEventIdArrayToEmitC>(typeConverter, ctx);
+  patterns.add<PTOEventIdArrayGetToEmitC>(typeConverter, ctx);
+  patterns.add<PTOEventIdArraySetToEmitC>(typeConverter, ctx);
   patterns.add<PTOTPushToEmitC>(typeConverter, ctx, targetArch);
   patterns.add<PTOTPopToEmitC>(typeConverter, ctx, targetArch);
   patterns.add<PTOTFreeToEmitC>(typeConverter, ctx, targetArch);
@@ -8559,6 +8635,11 @@ struct EmitPTOManualPass
         return signalPassFailure();
     }
 
+        bool needsEventIdArrayHelper = false;
+        mop.walk([&](mlir::pto::DeclareEventIdArrayOp) {
+          needsEventIdArrayHelper = true;
+        });
+
 		    // 1. 插入头文件
 	    auto loc = mop->getLoc();
 	    OpBuilder builder(ctx);
@@ -8567,6 +8648,19 @@ struct EmitPTOManualPass
 	        loc, builder.getStringAttr("pto/pto-inst.hpp"), /*isAngled=*/nullptr);
 	    builder.create<emitc::VerbatimOp>(
 	        loc, builder.getStringAttr("using namespace pto;"));
+        if (needsEventIdArrayHelper) {
+	      builder.create<emitc::VerbatimOp>(
+	          loc, builder.getStringAttr(R"cpp(
+template <int N>
+struct PTOAS_EventIdArray {
+  static_assert(N > 0, "PTOAS_EventIdArray requires a positive static size");
+  int32_t data[N] = {};
+
+  AICORE inline int32_t &operator[](int32_t idx) { return data[idx]; }
+  AICORE inline const int32_t &operator[](int32_t idx) const { return data[idx]; }
+};
+)cpp"));
+        }
 	    builder.create<emitc::VerbatimOp>(
 	        loc, builder.getStringAttr(R"cpp(
 enum class PTOAutoSyncTailMode : int {
