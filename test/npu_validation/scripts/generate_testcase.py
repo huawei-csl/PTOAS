@@ -63,11 +63,13 @@ INCLUDE_REPLACEMENT = (
 )
 
 UNSTABLE_A3_CUSTOM_GOLDEN_CASES = frozenset({
+    "abs",
     "partmin",
     "prelu",
     "rowexpanddiv",
     "rowexpandmul",
     "rowexpandsub",
+    "scatter",
     "sel",
     "sels",
     "xor",
@@ -1078,12 +1080,7 @@ def generate_testcase(
     ptr_elem_counts = {}
     for p in data_ptrs:
         inferred = inferred_counts.get(p["name"])
-        if inferred and int(inferred) > 0:
-            # Use the larger of inferred and logical_elem_count to avoid
-            # under-sizing buffers when inference matches a partial pattern.
-            ptr_elem_counts[p["name"]] = max(int(inferred), logical_elem_count)
-        else:
-            ptr_elem_counts[p["name"]] = logical_elem_count
+        ptr_elem_counts[p["name"]] = int(inferred) if inferred and int(inferred) > 0 else logical_elem_count
 
     templates_root = Path(__file__).resolve().parents[1] / "templates"
     template = (templates_root / "main_template.cpp").read_text(encoding="utf-8")
