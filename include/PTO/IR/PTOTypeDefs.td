@@ -195,6 +195,15 @@ def TileBufType : TypeDef<PTO_Dialect, "TileBuf"> {
   }];
 }
 
+def EventIdArrayType : TypeDef<PTO_Dialect, "EventIdArray"> {
+  let mnemonic = "eventid_array";
+  let summary = "Manual-only local array for dynamic event ids";
+  let parameters = (ins
+    "int64_t":$size
+  );
+  let assemblyFormat = "`<` $size `>`";
+}
+
 def PipeType : TypeDef<PTO_Dialect, "Pipe"> {
   let mnemonic = "pipe";
   let summary = "Opaque pipe handle type for TPUSH/TPOP communication";

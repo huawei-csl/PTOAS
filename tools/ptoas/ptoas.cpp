@@ -264,6 +264,8 @@ static bool parseAutoSyncTailHint(llvm::StringRef hintStr, std::string &normaliz
 //   PTOAS__TILE_SET_VALIDSHAPE(obj, r, c)   -> obj.SetValidShape(r, c)
 //   PTOAS__PTR_LOAD(ptr, offset)            -> ptr[offset]
 //   PTOAS__PTR_STORE(ptr, offset, val)      -> ptr[offset] = val
+//   PTOAS__EVENTID_ARRAY_LOAD(arr, idx)     -> arr[idx]
+//   PTOAS__EVENTID_ARRAY_STORE(arr, idx, v) -> arr[idx] = v
 // --------------------------------------------------------------------------
 static bool rewriteMarkerCallToMember(std::string &cpp, llvm::StringRef marker,
                                       llvm::StringRef memberName,
@@ -520,6 +522,19 @@ static void rewritePtrScalarMarkers(std::string &cpp) {
         cpp, "PTOAS__PTR_LOAD", /*expectedNumArgs=*/2, /*isStore=*/false);
     changed |= rewriteMarkerCallToSubscript(
         cpp, "PTOAS__PTR_STORE", /*expectedNumArgs=*/3, /*isStore=*/true);
+  }
+}
+
+static void rewriteEventIdArrayMarkers(std::string &cpp) {
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    changed |= rewriteMarkerCallToSubscript(
+        cpp, "PTOAS__EVENTID_ARRAY_LOAD", /*expectedNumArgs=*/2,
+        /*isStore=*/false);
+    changed |= rewriteMarkerCallToSubscript(
+        cpp, "PTOAS__EVENTID_ARRAY_STORE", /*expectedNumArgs=*/3,
+        /*isStore=*/true);
   }
 }
 
@@ -902,6 +917,7 @@ int main(int argc, char **argv) {
   cppOS.flush();
   rewriteTileGetSetValueMarkers(cppOutput);
   rewritePtrScalarMarkers(cppOutput);
+  rewriteEventIdArrayMarkers(cppOutput);
   rewriteAddPtrTraceMarkers(cppOutput, emitAddPtrTrace);
   rewriteHoistedGlobalTensorDecls(cppOutput);
   outputFile.os() << cppOutput;

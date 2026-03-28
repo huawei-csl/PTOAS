@@ -1492,6 +1492,50 @@ def DeclareTileOp : PTO_Op<"declare_tile", [Pure]> {
   }];
 }
 
+def DeclareEventIdArrayOp : PTO_Op<"declare_eventid_array"> {
+  let summary = "Declare a manual-only local event-id array";
+  let description = [{
+    Declares a local array used to store dynamic event ids in manual sync code.
+    This is a frontend/EmitC convenience feature and is not intended to
+    participate in PlanMemory or automatic synchronization passes.
+  }];
+
+  let results = (outs EventIdArrayType:$array);
+
+  let assemblyFormat = [{
+    attr-dict `->` qualified(type($array))
+  }];
+}
+
+def EventIdArrayGetOp : PTO_Op<"eventid_array_get"> {
+  let summary = "Read one element from a manual event-id array";
+
+  let arguments = (ins
+    EventIdArrayType:$array,
+    Index:$index
+  );
+  let results = (outs Index:$result);
+
+  let assemblyFormat = [{
+    $array `[` $index `]` attr-dict `:` qualified(type($array))
+  }];
+}
+
+def EventIdArraySetOp : PTO_Op<"eventid_array_set"> {
+  let summary = "Write one element into a manual event-id array";
+
+  let arguments = (ins
+    EventIdArrayType:$array,
+    Index:$index,
+    Index:$value
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    $array `[` $index `]` `,` $value attr-dict `:` qualified(type($array))
+  }];
+}
+
 def DeclareTileMemRefOp : PTO_Op<"declare_tile_memref", [Pure]> {
   let summary = "Internal memref placeholder for a tile whose address is assigned later";
   let description = [{
