@@ -234,6 +234,18 @@ static bool parseBuildLevel(llvm::StringRef levelStr, PTOBuildLevel &out) {
   return false;
 }
 
+static llvm::StringRef stringifyBuildLevel(PTOBuildLevel level) {
+  switch (level) {
+  case PTOBuildLevel::Level1:
+    return "level1";
+  case PTOBuildLevel::Level2:
+    return "level2";
+  case PTOBuildLevel::Level3:
+    return "level3";
+  }
+  llvm_unreachable("unsupported PTOBuildLevel");
+}
+
 static constexpr llvm::StringLiteral kAutoSyncTailPolicyBarrierAll =
     "barrier_all";
 static constexpr llvm::StringLiteral kAutoSyncTailPolicyMte3ToSEvent0 =
@@ -1020,6 +1032,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  module->getOperation()->setAttr(
+      "pto.build_level",
+      mlir::StringAttr::get(&context, stringifyBuildLevel(effectiveLevel)));
+
   bool invalidAutoSyncTailHint = false;
   module->walk([&](mlir::func::FuncOp func) {
     auto hintAttr =
@@ -1042,10 +1058,25 @@ int main(int argc, char **argv) {
   if (invalidAutoSyncTailHint)
     return 1;
 
+  bool hasTAssign = false;
+  module->walk([&](pto::TAssignOp) { hasTAssign = true; });
+
+  if (hasTAssign && effectiveLevel != PTOBuildLevel::Level3) {
+    llvm::errs() << "Error: pto.tassign is only supported when "
+                    "--pto-level=level3.\n";
+    return 1;
+  }
+
+  if (hasTAssign && enableInsertSync) {
+    llvm::errs() << "Error: pto.tassign requires --enable-insert-sync to be "
+                    "disabled.\n";
+    return 1;
+  }
+
   if (effectiveLevel == PTOBuildLevel::Level3) {
     bool missing = false;
     module->walk([&](pto::AllocTileOp op) {
-      if (!op.getAddr()) {
+      if (!op.getAddr() && !hasTAssign) {
         op.emitError("requires 'addr' operand when --pto-level=level3");
         missing = true;
       }
