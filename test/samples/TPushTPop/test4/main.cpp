@@ -35,8 +35,21 @@ static uint16_t floatToBf16Bits(float value) {
   return static_cast<uint16_t>(bits >> 16);
 }
 
+static float bf16BitsToFloat(uint16_t bits) {
+  const uint32_t storage = static_cast<uint32_t>(bits) << 16;
+  float value = 0.0f;
+  std::memcpy(&value, &storage, sizeof(value));
+  return value;
+}
+
+// Use deterministic small integers so the input is less trivial while BF16
+// conversion stays exact.
+static float lhsValue(int row, int col) {
+  return static_cast<float>(((row * 17 + col * 29 + 3) % 7) - 3);
+}
+
 static float rhsValue(int row, int col) {
-  return static_cast<float>((row * 5 + col) % 32);
+  return static_cast<float>(((row * 13 + col * 19 + 5) % 9) - 4);
 }
 
 int main() {
@@ -49,19 +62,31 @@ int main() {
   constexpr size_t rhsBytes = static_cast<size_t>(depth) * cols * sizeof(uint16_t);
 
   std::vector<float> hostOut(rows * cols, 1.0f);
-  std::vector<float> hostGolden(rows * cols, 1.0f);
+  std::vector<float> hostGolden(rows * cols, 0.0f);
   std::vector<uint16_t> hostLhs(rows * depth, 0);
   std::vector<uint16_t> hostRhs(depth * cols, 0);
 
-  for (int row = 0; row < rows; ++row)
-    hostLhs[row * depth + row] = floatToBf16Bits(1.0f);
+  for (int row = 0; row < rows; ++row) {
+    for (int col = 0; col < depth; ++col)
+      hostLhs[row * depth + col] = floatToBf16Bits(lhsValue(row, col));
+  }
 
   for (int row = 0; row < depth; ++row) {
     for (int col = 0; col < cols; ++col) {
       const float value = rhsValue(row, col);
       hostRhs[row * cols + col] = floatToBf16Bits(value);
-      if (row < rows)
-        hostGolden[row * cols + col] += value;
+    }
+  }
+
+  for (int row = 0; row < rows; ++row) {
+    for (int col = 0; col < cols; ++col) {
+      float expected = hostOut[row * cols + col];
+      for (int k = 0; k < depth; ++k) {
+        const float lhs = bf16BitsToFloat(hostLhs[row * depth + k]);
+        const float rhs = bf16BitsToFloat(hostRhs[k * cols + col]);
+        expected += lhs * rhs;
+      }
+      hostGolden[row * cols + col] = expected;
     }
   }
 
